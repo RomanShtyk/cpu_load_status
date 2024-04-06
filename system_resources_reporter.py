@@ -1,10 +1,39 @@
 import math
+import os
+import pkgutil
+import sys
 import threading
 
 import rumps
 import psutil
 
 UI_MODE = ["Emojis", "Text"]
+
+
+def get_last_saved_mode() -> int:
+    try:
+        with open(resource_path('db.txt'), 'r') as file:
+            try:
+                return int(file.read())
+            except ValueError:
+                return 0
+    except FileNotFoundError:
+        open(resource_path("db.txt"), "x")
+        return 0
+
+
+def set_last_saved_mode(index: int) -> None:
+    with open(resource_path('db.txt'), 'w') as file:
+        file.write(str(index))
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 def convert_to_subscript(text):
@@ -38,8 +67,9 @@ def convert_size_light(size_bytes):
 class SystemResourcesReported(rumps.App):
     def __init__(self):
         super(SystemResourcesReported, self).__init__("Loading...", quit_button=None)
-        self.ui_mode = UI_MODE[self.get_last_saved_mode()]
-        self.set_menu(self.get_last_saved_mode())
+        last_saved_mode = get_last_saved_mode()
+        self.ui_mode = UI_MODE[last_saved_mode]
+        self.set_menu(last_saved_mode)
 
     @rumps.clicked(UI_MODE[0])
     def ui_mode_0(self, _):
@@ -52,9 +82,9 @@ class SystemResourcesReported(rumps.App):
         self.set_menu(1)
 
     def set_menu(self, index):
-        self.set_last_saved_mode(index)
+        set_last_saved_mode(index)
         self.menu.clear()
-        icon = "tick.png"
+        icon = resource_path("tick.png")
         self.update_current_system_report(interval=0.1)
 
         item = rumps.MenuItem(UI_MODE[0], callback=self.ui_mode_0)
@@ -87,19 +117,6 @@ class SystemResourcesReported(rumps.App):
             memory_available = convert_size(psutil.virtual_memory().available)
             report = f"CPU: {cpu_percentage}% RAM: {memory_available}"
         self.title = report
-
-    @staticmethod
-    def get_last_saved_mode() -> int:
-        with open('db.txt', 'r') as file:
-            try:
-                return int(file.read())
-            except ValueError:
-                return 0
-
-    @staticmethod
-    def set_last_saved_mode(index: int) -> None:
-        with open('db.txt', 'w') as file:
-            file.write(str(index))
 
 
 if __name__ == "__main__":
