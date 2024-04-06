@@ -1,13 +1,12 @@
 import math
 import os
-import pkgutil
 import sys
 import threading
-
 import rumps
 import psutil
 
 UI_MODE = ["Emojis", "Text"]
+INTERVAL = 5
 
 
 def get_last_saved_mode() -> int:
@@ -69,7 +68,10 @@ class SystemResourcesReported(rumps.App):
         super(SystemResourcesReported, self).__init__("Loading...", quit_button=None)
         last_saved_mode = get_last_saved_mode()
         self.ui_mode = UI_MODE[last_saved_mode]
+        self.t = None
+        self.is_active = True
         self.set_menu(last_saved_mode)
+        threading.Thread(target=self.update_title_loop, args=[INTERVAL, ], daemon=True).start()
 
     @rumps.clicked(UI_MODE[0])
     def ui_mode_0(self, _):
@@ -97,17 +99,21 @@ class SystemResourcesReported(rumps.App):
             item.icon = icon
         self.menu.add(item)
 
-        item = rumps.MenuItem("Quit", callback=rumps.quit_application)
+        item = rumps.MenuItem("Quit", callback=self.close)
         self.menu.add(item)
 
-    @rumps.timer(5)
-    def update_title(self, _):
-        t = threading.Thread(target=self.update_current_system_report, args=[4, ], daemon=True)
-        t.start()
+    def close(self, _):
+        self.is_active = False
+        rumps.quit_application()
+
+    def update_title_loop(self, _):
+        while self.is_active:
+            self.update_current_system_report(INTERVAL)
 
     def update_current_system_report(self, interval) -> None:
         report = ""
         cpu_percentage = psutil.cpu_percent(interval=interval)
+
         if self.ui_mode == UI_MODE[0]:
             memory_percentage = convert_size_light(psutil.virtual_memory().available)
             cpu_percentage = cpu_percentage.__round__()
@@ -116,6 +122,7 @@ class SystemResourcesReported(rumps.App):
         elif self.ui_mode == UI_MODE[1]:
             memory_available = convert_size(psutil.virtual_memory().available)
             report = f"CPU: {cpu_percentage}% RAM: {memory_available}"
+
         self.title = report
 
 
